@@ -14,8 +14,6 @@ const preview = document.querySelector('#imagePreview');
 const charCount = document.querySelector('#charCount');
 const totalLabel = document.querySelector('#totalLabel');
 const todayLabel = document.querySelector('#todayDate');
-const statusLabel = document.querySelector('#connectionStatus');
-const modeInfo = document.querySelector('#modeInfo');
 const message = document.querySelector('#appMessage');
 const today = new Date();
 todayLabel.textContent = formatTimestamp(today);
@@ -195,8 +193,6 @@ list.addEventListener('click', async event => {
 });
 
 if (client) {
-  statusLabel.textContent = 'Supabase 연결 중';
-  modeInfo.textContent = '게시글은 Supabase에 저장되며 다른 접속자에게 실시간 반영됩니다.';
   showMessage('게시글을 불러오는 중입니다.');
   loadRemotePosts().then(() => showMessage()).catch(error => {
     showMessage(`게시글을 불러오지 못했습니다: ${error.message || '연결 오류'}`, 'error');
@@ -206,15 +202,10 @@ if (client) {
       loadRemotePosts().catch(error => showMessage(`목록을 갱신하지 못했습니다: ${error.message || '연결 오류'}`, 'error'));
     })
     .subscribe(status => {
-      if (status === 'SUBSCRIBED') statusLabel.textContent = 'Supabase 연결됨';
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        statusLabel.textContent = '실시간 연결 오류';
         showMessage('실시간 연결이 끊겼습니다. 페이지를 새로고침해 주세요.', 'error');
       }
     });
-} else {
-  statusLabel.textContent = '미리보기 모드';
-  modeInfo.textContent = '작성한 글은 현재 브라우저에만 표시됩니다.';
 }
 
 drawNotes();
