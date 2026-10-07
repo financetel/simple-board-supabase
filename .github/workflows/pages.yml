@@ -1,0 +1,40 @@
+name: Deploy static site to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+      - name: Create Supabase public client config
+        env:
+          PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          node -e 'const fs=require("node:fs"); const c={url:process.env.PUBLIC_SUPABASE_URL,publishableKey:process.env.PUBLIC_SUPABASE_PUBLISHABLE_KEY}; if(!c.url||!c.publishableKey) throw new Error("Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY repository secrets."); fs.writeFileSync("supabase-config.js", "window.SUPABASE_CONFIG = " + JSON.stringify(c) + ";\n");'
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
