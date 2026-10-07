@@ -171,7 +171,7 @@ list.addEventListener('click', async event => {
   const button = event.target.closest('[data-delete]');
   if (!button) return;
   const note = notes.find(item => item.id === button.dataset.delete);
-  if (!note || !window.confirm('게시글을 삭제할까요? 삭제한 글은 복구할 수 없습니다.')) return;
+  if (!note) return;
   button.disabled = true;
   showMessage();
   try {
