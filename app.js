@@ -134,7 +134,10 @@ async function storePhoto(file) {
 form.addEventListener('submit', async event => {
   event.preventDefault();
   const text = content.value.trim();
-  if (!text || submitting) return;
+  if ((!text && !selectedPhoto) || submitting) {
+    if (!text && !selectedPhoto) showMessage('내용이나 사진을 하나 이상 입력해 주세요.', 'error');
+    return;
+  }
   submitting = true;
   const submitButton = form.querySelector('[type="submit"]');
   submitButton.disabled = true;

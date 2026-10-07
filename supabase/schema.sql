@@ -1,12 +1,18 @@
 -- Run this file in Supabase SQL Editor for the public, no-login bulletin board.
 create table if not exists public.posts (
   id uuid primary key default gen_random_uuid(),
-  content text not null check (char_length(content) between 1 and 500),
+  content text not null,
   image_path text,
   created_at timestamptz not null default now()
 );
 
 alter table public.posts drop column if exists author;
+alter table public.posts drop constraint if exists posts_content_check;
+alter table public.posts add constraint posts_content_check
+  check (
+    char_length(content) between 1 and 500
+    or (content = '' and image_path is not null)
+  );
 alter table public.posts enable row level security;
 alter table public.posts replica identity full;
 grant select, insert, delete on public.posts to anon;
