@@ -1,14 +1,13 @@
 const seedNotes = [
-  { id: 'sample-1', author: '사용자 1', date: '2026. 10. 07', text: '테스트 게시글입니다.', photoUrl: 'assets/notebook-sample.jpg' },
-  { id: 'sample-2', author: '사용자 2', date: '2026. 10. 06', text: '사진 첨부 예시입니다.' },
-  { id: 'sample-3', author: '사용자 3', date: '2026. 10. 06', text: '게시글 목록은 최신순으로 표시됩니다.' },
-  { id: 'sample-4', author: '사용자 4', date: '2026. 10. 05', text: '두 번째 줄에 표시되는 글 내용입니다.\n줄바꿈도 적용됩니다.' },
-  { id: 'sample-5', author: '사용자 5', date: '2026. 10. 04', text: '게시글 등록 및 삭제 화면 확인용입니다.' }
+  { id: 'sample-1', date: '2026. 10. 07. 14:23:05', text: '테스트 게시글입니다.', photoUrl: 'assets/notebook-sample.jpg' },
+  { id: 'sample-2', date: '2026. 10. 06. 11:42:18', text: '사진 첨부 예시입니다.' },
+  { id: 'sample-3', date: '2026. 10. 06. 09:15:42', text: '게시글 목록은 최신순으로 표시됩니다.' },
+  { id: 'sample-4', date: '2026. 10. 05. 17:08:33', text: '두 번째 줄에 표시되는 글 내용입니다.\n줄바꿈도 적용됩니다.' },
+  { id: 'sample-5', date: '2026. 10. 04. 08:51:09', text: '게시글 등록 및 삭제 화면 확인용입니다.' }
 ];
 
 const list = document.querySelector('#notesList');
 const form = document.querySelector('#postForm');
-const authorInput = document.querySelector('#author');
 const content = document.querySelector('#content');
 const photoInput = document.querySelector('#photoInput');
 const preview = document.querySelector('#imagePreview');
@@ -19,16 +18,29 @@ const statusLabel = document.querySelector('#connectionStatus');
 const modeInfo = document.querySelector('#modeInfo');
 const message = document.querySelector('#appMessage');
 const today = new Date();
-todayLabel.textContent = formatDate(today);
+todayLabel.textContent = formatTimestamp(today);
 
-function formatDate(date) {
-  return new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' })
-    .format(date).replaceAll('. ', '. ').replace(/\.$/, '');
+function formatTimestamp(date) {
+  const parts = new Intl.DateTimeFormat('ko-KR', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23'
+  }).formatToParts(date).reduce((values, part) => {
+    values[part.type] = part.value;
+    return values;
+  }, {});
+  return `${parts.year}. ${parts.month}. ${parts.day}. ${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const config = window.SUPABASE_CONFIG || {};
-const isConfigured = Boolean(config.url && config.publishableKey && window.supabase?.createClient);
+const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
+const isConfigured = !isPreview && Boolean(config.url && config.publishableKey && window.supabase?.createClient);
 const client = isConfigured ? window.supabase.createClient(config.url, config.publishableKey) : null;
 const imageBucket = 'post-images';
 let notes = isConfigured ? [] : [...seedNotes];
@@ -43,16 +55,17 @@ function showMessage(text = '', kind = 'info') {
 }
 
 function drawNotes() {
-  list.innerHTML = notes.map((note, i) => `
+  list.innerHTML = notes.map((note, i) => {
+    return `
     <article class="note-card" data-index="${String(i + 1).padStart(2, '0')}">
       <div class="note-head">
-        <span class="note-author">${escapeHtml(note.author)}</span>
         <span class="note-date">${escapeHtml(note.date)}</span>
-        <button class="delete-button" data-delete="${escapeHtml(note.id)}" aria-label="${escapeHtml(note.author)} 글 삭제">삭제</button>
+        <button class="delete-button" data-delete="${escapeHtml(note.id)}" aria-label="게시글 삭제">삭제</button>
       </div>
       <div class="note-body">${escapeHtml(note.text)}</div>
       ${note.photoUrl ? `<img class="note-image" src="${escapeHtml(note.photoUrl)}" alt="게시글 첨부 사진" loading="lazy" />` : ''}
-    </article>`).join('');
+    </article>`;
+  }).join('');
   totalLabel.textContent = String(notes.length).padStart(2, '0');
 }
 
@@ -96,14 +109,13 @@ content.addEventListener('input', () => {
 
 async function loadRemotePosts() {
   const { data, error } = await client.from('posts')
-    .select('id, author, content, image_path, created_at')
+    .select('id, content, image_path, created_at')
     .order('created_at', { ascending: false });
   if (error) throw error;
   notes = data.map(post => ({
     id: post.id,
-    author: post.author,
     text: post.content,
-    date: formatDate(new Date(post.created_at)),
+    date: formatTimestamp(new Date(post.created_at)),
     imagePath: post.image_path,
     photoUrl: post.image_path ? client.storage.from(imageBucket).getPublicUrl(post.image_path).data.publicUrl : ''
   }));
@@ -127,19 +139,17 @@ form.addEventListener('submit', async event => {
   const submitButton = form.querySelector('[type="submit"]');
   submitButton.disabled = true;
   showMessage();
-  const author = authorInput.value.trim() || '익명';
-
   try {
     if (client) {
       const imagePath = await storePhoto(selectedPhoto);
-      const { error } = await client.from('posts').insert({ author, content: text, image_path: imagePath || null });
+      const { error } = await client.from('posts').insert({ content: text, image_path: imagePath || null });
       if (error) {
         if (imagePath) await client.storage.from(imageBucket).remove([imagePath]);
         throw error;
       }
       await loadRemotePosts();
     } else {
-      notes.unshift({ id: crypto.randomUUID(), author, date: todayLabel.textContent, text, photoUrl: previewUrl });
+      notes.unshift({ id: crypto.randomUUID(), date: formatTimestamp(new Date()), text, photoUrl: previewUrl });
       drawNotes();
     }
     form.reset();
